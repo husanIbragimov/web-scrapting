@@ -17,21 +17,23 @@ class AmazonScraper(BaseScraper):
     DELAY = 2.0
 
     async def goto_search(self, page: Page, query: str) -> None:
-        # Visit homepage first and set US delivery location (ZIP 10001 = New York)
-        # so that Amazon shows USD prices rather than "cannot ship to your location"
+        # Visit homepage and set US delivery ZIP (10001 = New York) so Amazon
+        # shows USD prices instead of "cannot ship to your location"
         await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_timeout(1500)
         loc_btn = await page.query_selector("#nav-global-location-popover-link")
         if loc_btn:
             await loc_btn.click()
-            await page.wait_for_timeout(800)
-            zip_input = await page.query_selector("input[data-action-type='GLB_CHANGE_LOCATION']")
+            await page.wait_for_timeout(1000)
+            zip_input = await page.query_selector("#GLUXZipUpdateInput")
             if zip_input:
                 await zip_input.fill("10001")
-                done_btn = await page.query_selector("span[data-action-type='GLB_CHANGE_LOCATION']")
-                if done_btn:
-                    await done_btn.click()
-                    await page.wait_for_timeout(2000)
+                apply_btn = await page.query_selector("#GLUXZipUpdate")
+                if apply_btn:
+                    await apply_btn.click()
+                else:
+                    await zip_input.press("Enter")
+                await page.wait_for_timeout(2000)
         url = SEARCH_URL.format(query=query.replace(" ", "+"))
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_selector(
