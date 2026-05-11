@@ -15,16 +15,24 @@ class EbayScraper(BaseScraper):
     DELAY = 1.5
 
     async def goto_search(self, page: Page, query: str) -> None:
-        url = SEARCH_URL.format(query=query.replace(" ", "+"))
-        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_selector("ul.srp-results li.s-item", timeout=15000)
+        # Visit homepage first to avoid bot detection on direct search URLs
+        await page.goto("https://www.ebay.com", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(2000)
+        search_box = await page.query_selector("input#gh-ac")
+        if search_box:
+            await search_box.fill(query)
+            await search_box.press("Enter")
+        else:
+            url = SEARCH_URL.format(query=query.replace(" ", "+"))
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_selector("a[href*='ebay.com/itm/']", timeout=20000)
 
     async def get_product_urls(self, page: Page) -> List[str]:
-        links = await page.query_selector_all("ul.srp-results li.s-item a.s-item__link")
+        links = await page.query_selector_all("a[href*='ebay.com/itm/']")
         urls = []
         for link in links:
             href = await link.get_attribute("href")
-            if href and "ebay.com/itm/" in href:
+            if href:
                 urls.append(href.split("?")[0])
         return list(dict.fromkeys(urls))
 

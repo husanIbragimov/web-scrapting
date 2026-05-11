@@ -25,17 +25,13 @@ class AmazonScraper(BaseScraper):
 
     async def get_product_urls(self, page: Page) -> List[str]:
         links = await page.query_selector_all(
-            "div[data-component-type='s-search-result'] h2 a.a-link-normal"
+            "div[data-component-type='s-search-result'] a[href*='/dp/']"
         )
         urls = []
         for link in links:
             href = await link.get_attribute("href")
-            if href and "/dp/" in href:
-                full = (
-                    href
-                    if href.startswith("http")
-                    else f"https://www.amazon.com{href}"
-                )
+            if href:
+                full = href if href.startswith("http") else f"https://www.amazon.com{href}"
                 urls.append(full.split("?")[0])
         return list(dict.fromkeys(urls))
 
