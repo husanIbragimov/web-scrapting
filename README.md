@@ -222,6 +222,8 @@ pytest tests/ -v
 | Amazon shows no price | Non-US IP; geo-restricted products | US ZIP is set automatically; some products are still "See price in cart" |
 | eBay "Access Denied" | Direct search URL blocked | Scraper navigates via homepage + search box |
 | Yandex Market CAPTCHA | Non-Russian IP | Logged as error; other sites continue unaffected |
+| Uzum CAPTCHA | Rapid repeated requests trigger rate-limit | Clears after ~2 min; single runs work fine; handled like Yandex |
+| Wildberries CSS selectors | Uses hashed CSS Modules (`productLineName--xxxx`) | Scraper matches stable class prefixes via `[class*="…"]` |
 | Temu selectors break | CSS Modules hashes change | Update `parse_product_html` partial class matches in `temu.py` |
 | AliExpress slow | Heavy JS SPA, networkidle waits | Normal; `DELAY = 2.0` and 45 s timeout are intentional |
 
