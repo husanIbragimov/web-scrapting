@@ -17,6 +17,21 @@ class AmazonScraper(BaseScraper):
     DELAY = 2.0
 
     async def goto_search(self, page: Page, query: str) -> None:
+        # Visit homepage first and set US delivery location (ZIP 10001 = New York)
+        # so that Amazon shows USD prices rather than "cannot ship to your location"
+        await page.goto("https://www.amazon.com", wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(1500)
+        loc_btn = await page.query_selector("#nav-global-location-popover-link")
+        if loc_btn:
+            await loc_btn.click()
+            await page.wait_for_timeout(800)
+            zip_input = await page.query_selector("input[data-action-type='GLB_CHANGE_LOCATION']")
+            if zip_input:
+                await zip_input.fill("10001")
+                done_btn = await page.query_selector("span[data-action-type='GLB_CHANGE_LOCATION']")
+                if done_btn:
+                    await done_btn.click()
+                    await page.wait_for_timeout(2000)
         url = SEARCH_URL.format(query=query.replace(" ", "+"))
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
         await page.wait_for_selector(
@@ -42,14 +57,45 @@ class AmazonScraper(BaseScraper):
         except Exception:
             logger.warning(f"[amazon] Timeout waiting for #productTitle at {url}")
             return None
+        await page.wait_for_timeout(2000)  # allow price JS to render
         html = await page.content()
         raw = self.parse_product_html(html, url)
-        return Product(
-            url=url,
-            source_site="amazon",
-            currency="USD",
-            **raw,
-        )
+        # BS4 price extraction misses dynamically-rendered prices; fall back to JS
+        if not raw.get("price"):
+            raw["price"] = await self._extract_price_js(page)
+        return Product(url=url, source_site="amazon", currency="USD", **raw)
+
+    @staticmethod
+    async def _extract_price_js(page: Page) -> Optional[str]:
+        """Extract price from the live rendered DOM via JavaScript."""
+        return await page.evaluate("""
+            () => {
+                const candidates = [
+                    '.priceToPay .a-offscreen',
+                    '#corePrice_desktop .a-offscreen',
+                    '#price_inside_buybox',
+                    '.a-price[data-a-size="xl"] .a-offscreen',
+                    '.a-price[data-a-size="b"] .a-offscreen',
+                    '#usedPrice',
+                ];
+                for (const sel of candidates) {
+                    const el = document.querySelector(sel);
+                    if (el) {
+                        const t = (el.innerText || el.textContent || '').trim();
+                        if (t && t.includes('$')) return t;
+                    }
+                }
+                // Scan all leaf text nodes for bare $X.XX price
+                const all = document.querySelectorAll('*');
+                for (const el of all) {
+                    if (!el.children.length) {
+                        const t = (el.innerText || '').trim();
+                        if (/^\\$[\\d,]+\\.\\d{2}$/.test(t)) return t;
+                    }
+                }
+                return null;
+            }
+        """)
 
     async def go_to_next_page(self, page: Page) -> bool:
         next_btn = await page.query_selector(
