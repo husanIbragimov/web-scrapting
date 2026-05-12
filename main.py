@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import pathlib
+from datetime import datetime
 from typing import List
 
 from playwright.async_api import async_playwright
@@ -8,12 +9,36 @@ from rich.console import Console
 from rich.prompt import Prompt, IntPrompt
 from rich.table import Table
 
-from config import SITES, DB_PATH, DEFAULT_MAX_PRODUCTS
+from config import SITES, DB_PATH, DEFAULT_MAX_PRODUCTS, LOG_PATH
 from db.database import AsyncDatabase
 from exporters.exporter import export
 
 console = Console()
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+
+
+def _setup_logging() -> None:
+    log_dir = pathlib.Path(LOG_PATH)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = log_dir / f"scrape_{timestamp}.log"
+
+    fmt = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s %(message)s")
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(fmt)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(fmt)
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
+
+    logging.getLogger(__name__).info(f"Logging to {log_file}")
+
+
+_setup_logging()
 
 
 def prompt_sites() -> List[str]:

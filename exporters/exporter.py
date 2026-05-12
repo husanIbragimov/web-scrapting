@@ -1,13 +1,15 @@
 import pathlib
-import pandas as pd
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+
+import pandas as pd
+
 
 def generate_filename(query: str, fmt: str, output_dir: pathlib.Path = None) -> pathlib.Path:
     if output_dir is None:
         output_dir = pathlib.Path("output")
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    return output_dir / f"products_{timestamp}.{fmt}"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return output_dir / f"{query}_{timestamp}.{fmt}"
 
 def export(
     rows: List[Dict[str, Any]],
